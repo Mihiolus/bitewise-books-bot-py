@@ -15,7 +15,12 @@ if len(BOT_TOKEN) == 0:
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await context.bot.send_message(chat_id=update.effective_chat.id, text="I'm a bot, please talk to me!")
+    await context.bot.send_message(chat_id=update.effective_chat.id, text="Привет! Я не буду читать книжки за тебя, "
+                                                                          "но могу помочь.\n\nДля начала, рекомендую "
+                                                                          "установить твой часовой пояс с помощью "
+                                                                          "команды /settings. После этого, "
+                                                                          "можешь загружать книжку с помощью команды "
+                                                                          "/newbook.")
 
 
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):

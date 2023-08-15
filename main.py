@@ -1,16 +1,42 @@
-# This is a sample Python script.
+import logging
+from telegram import Update
+from telegram.ext import filters, MessageHandler, ApplicationBuilder, CommandHandler, ContextTypes
+from os import environ
 
-# Press Shift+F10 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+
+BOT_TOKEN = environ.get('BOT_TOKEN', '')
+if len(BOT_TOKEN) == 0:
+    logging.error("BOT_TOKEN variable is missing! Exiting now.")
+    exit(1)
 
 
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press Ctrl+F8 to toggle the breakpoint.
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await context.bot.send_message(chat_id=update.effective_chat.id, text="I'm a bot, please talk to me!")
 
 
-# Press the green button in the gutter to run the script.
+async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await context.bot.send_message(chat_id=update.effective_chat.id, text=update.message.text)
+
+
+async def caps(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text_caps = ' '.join(context.args).upper()
+    await context.bot.send_message(chat_id=update.effective_chat.id, text=text_caps)
+
+
 if __name__ == '__main__':
-    print_hi('PyCharm')
+    application = ApplicationBuilder().token(BOT_TOKEN).build()
 
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+    start_handler = CommandHandler('start', start)
+    application.add_handler(start_handler)
+
+    echo_handler = MessageHandler(filters.TEXT & (~filters.COMMAND), echo)
+    application.add_handler(echo_handler)
+
+    caps_handler = CommandHandler('caps', caps)
+    application.add_handler(caps_handler)
+
+    application.run_polling()

@@ -3,7 +3,7 @@ import re
 
 from telegram import Update, InlineKeyboardButton,InlineKeyboardMarkup
 from telegram.ext import filters, MessageHandler, ApplicationBuilder, CommandHandler, ContextTypes, PicklePersistence, \
-    ConversationHandler
+    ConversationHandler, CallbackQueryHandler
 from os import environ
 import ebooklib
 from ebooklib import epub
@@ -86,6 +86,13 @@ async def set_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return ConversationHandler.END
 
 
+async def next_bite(update:Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+
+    await query.edit_message_text(text=query.message.text)
+
+
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user = update.message.from_user
     await  update.message.reply_text(
@@ -114,5 +121,7 @@ if __name__ == '__main__':
         fallbacks=[CommandHandler("cancel", cancel)],
     )
     application.add_handler(newbook_handler)
+
+    application.add_handler(CallbackQueryHandler(next_bite))
 
     application.run_polling()

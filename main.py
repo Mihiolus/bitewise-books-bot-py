@@ -1,3 +1,4 @@
+import datetime
 import logging
 import re
 
@@ -38,7 +39,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Ask the user about their UTC offset"""
-    if (context.user_data.get("timezone")):
+    if context.user_data.get("timezone"):
         reply_text = (f"Согласно моим данным, твой часовой пояс - {context.user_data['timezone']}."
                       f"")
     else:
@@ -62,6 +63,7 @@ async def upload_book(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     await new_file.download_to_drive(custom_path=filepath)
 
     book = epub.read_epub(filepath)
+    context.user_data["book_path"] = filepath
     await update.message.reply_text(
         f"Получил книжку \"{book.title}\".\nТеперь напиши, по сколько символов мне тебе посылать.")
 
@@ -71,6 +73,7 @@ async def upload_book(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 async def set_n_chars(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     text = update.message.text
     n_chars = int(text)
+    context.user_data["n_chars"] = n_chars
     await update.message.reply_text(f"Хорошо. Я буду посылать книжку по {n_chars} символов.\nТеперь напиши, в какое "
                                     f"время посылать, в формате чч:мм.")
 
@@ -79,8 +82,10 @@ async def set_n_chars(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 
 async def set_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     text = update.message.text
-    time = re.split(r':', text)
-    await update.message.reply_text(f"Хорошо. Я буду посылать книжку в {time[0]}:{time[1]}.",
+    timelist = re.split(r':', text)
+    time = datetime.time(int(timelist[0]),int(timelist[1]),)
+    context.user_data["time"] = time
+    await update.message.reply_text(f"Хорошо. Я буду посылать книжку в {time.isoformat(timespec='minutes')}.",
                                     reply_markup=next_bite_markup)
 
     return ConversationHandler.END

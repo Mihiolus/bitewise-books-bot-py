@@ -5,6 +5,8 @@ from telegram import Update
 from telegram.ext import filters, MessageHandler, ApplicationBuilder, CommandHandler, ContextTypes, PicklePersistence, \
     ConversationHandler
 from os import environ
+import ebooklib
+from ebooklib import epub
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -51,8 +53,14 @@ async def newbook(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def upload_book(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     document = update.message.document
+    file_id = document.file_id
+    new_file = await update.get_bot().getFile(file_id)
+    filepath = str(update.message.from_user.id) + " download.epub"
+    await new_file.download_to_drive(custom_path=filepath)
+
+    book = epub.read_epub(filepath)
     await update.message.reply_text(
-        f"Получил документ {document.mime_type}.\nТеперь напиши, по сколько символов мне тебе посылать.")
+        f"Получил книжку \"{book.title}\".\nТеперь напиши, по сколько символов мне тебе посылать.")
 
     return SET_N_CHARS
 
@@ -69,7 +77,7 @@ async def set_n_chars(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 async def set_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     text = update.message.text
     time = re.split(r':', text)
-    await update.message.reply_text(f"Хорошо. Я буду посылать книжку в {time[0]}:{time[1]}")
+    await update.message.reply_text(f"Хорошо. Я буду посылать книжку в {time[0]}:{time[1]}.")
 
     return ConversationHandler.END
 

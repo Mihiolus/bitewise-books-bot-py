@@ -1,7 +1,7 @@
 import logging
 import re
 
-from telegram import Update
+from telegram import Update, InlineKeyboardButton,InlineKeyboardMarkup
 from telegram.ext import filters, MessageHandler, ApplicationBuilder, CommandHandler, ContextTypes, PicklePersistence, \
     ConversationHandler
 from os import environ
@@ -16,6 +16,9 @@ logging.basicConfig(
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
 UPLOAD_BOOK, SET_N_CHARS, SET_TIME = range(3)
+
+next_bite_keyboard = [[InlineKeyboardButton("Следующий ломтик", callback_data="1")]]
+next_bite_markup = InlineKeyboardMarkup(next_bite_keyboard)
 
 BOT_TOKEN = environ.get('BOT_TOKEN', '')
 if len(BOT_TOKEN) == 0:
@@ -77,7 +80,8 @@ async def set_n_chars(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 async def set_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     text = update.message.text
     time = re.split(r':', text)
-    await update.message.reply_text(f"Хорошо. Я буду посылать книжку в {time[0]}:{time[1]}.")
+    await update.message.reply_text(f"Хорошо. Я буду посылать книжку в {time[0]}:{time[1]}.",
+                                    reply_markup=next_bite_markup)
 
     return ConversationHandler.END
 

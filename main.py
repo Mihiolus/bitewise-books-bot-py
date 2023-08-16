@@ -1,12 +1,14 @@
 import logging
 from telegram import Update
-from telegram.ext import filters, MessageHandler, ApplicationBuilder, CommandHandler, ContextTypes
+from telegram.ext import filters, MessageHandler, ApplicationBuilder, CommandHandler, ContextTypes, PicklePersistence, ConversationHandler
 from os import environ
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
+
+SETTINGS = 0
 
 BOT_TOKEN = environ.get('BOT_TOKEN', '')
 if len(BOT_TOKEN) == 0:
@@ -15,33 +17,42 @@ if len(BOT_TOKEN) == 0:
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await context.bot.send_message(chat_id=update.effective_chat.id, text="Привет! Я не буду читать книжки за тебя, "
-                                                                          "но могу помочь.\n\nДля начала, рекомендую "
-                                                                          "установить твой часовой пояс с помощью "
-                                                                          "команды /settings. После этого, "
-                                                                          "можешь загружать книжку с помощью команды "
-                                                                          "/newbook.")
+    reply_text = "Привет! Я не буду читать книжки за тебя, " \
+                 "но могу помочь.\n\nДля начала, рекомендую " \
+                 "установить твой часовой пояс с помощью " \
+                 "команды /settings. После этого, " \
+                 "можешь загружать книжку с помощью команды " \
+                 "/newbook."
+    await context.bot.send_message(chat_id=update.effective_chat.id, text=reply_text)
+
+
+async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Ask the user about their UTC offset"""
+    if (context.user_data.get("timezone")):
+        reply_text = (f"Согласно моим данным, твой часовой пояс - {context.user_data['timezone']}."
+                      f"")
+    else:
+        reply_text = "Пожалуйста, введи свой часовой пояс."
+    await update.message.reply_text(reply_text)
+
+    return SETTINGS
 
 
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(chat_id=update.effective_chat.id, text=update.message.text)
 
 
-async def caps(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text_caps = ' '.join(context.args).upper()
-    await context.bot.send_message(chat_id=update.effective_chat.id, text=text_caps)
-
-
 if __name__ == '__main__':
-    application = ApplicationBuilder().token(BOT_TOKEN).build()
+    persistence = PicklePersistence(filepath="bitewisebooksbot.pickle")
+    application = ApplicationBuilder().token(BOT_TOKEN).concurrent_updates(False).persistence(persistence).build()
 
     start_handler = CommandHandler('start', start)
     application.add_handler(start_handler)
 
+    settings_handler = CommandHandler('settings', settings)
+    application.add_handler(settings_handler)
+
     echo_handler = MessageHandler(filters.TEXT & (~filters.COMMAND), echo)
     application.add_handler(echo_handler)
-
-    caps_handler = CommandHandler('caps', caps)
-    application.add_handler(caps_handler)
 
     application.run_polling()

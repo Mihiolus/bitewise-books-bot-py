@@ -16,7 +16,7 @@ logging.basicConfig(
 # set higher logging level for httpx to avoid all GET and POST requests being logged
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
-UPLOAD_BOOK, SET_N_CHARS, SET_TIME = range(3)
+UPLOAD_BOOK, SET_N_CHARS, SET_TIME, SET_TIMEZONE = range(4)
 
 next_bite_keyboard = [[InlineKeyboardButton("Следующий ломтик", callback_data="1")]]
 next_bite_markup = InlineKeyboardMarkup(next_bite_keyboard)
@@ -35,16 +35,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                  "можешь загружать книжку с помощью команды " \
                  "/newbook."
     await context.bot.send_message(chat_id=update.effective_chat.id, text=reply_text)
-
-
-async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Ask the user about their UTC offset"""
-    if context.user_data.get("timezone"):
-        reply_text = (f"Согласно моим данным, твой часовой пояс - {context.user_data['timezone']}."
-                      f"")
-    else:
-        reply_text = "Пожалуйста, введи свой часовой пояс."
-    await update.message.reply_text(reply_text)
 
 
 async def newbook(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -74,24 +64,54 @@ async def set_n_chars(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     text = update.message.text
     n_chars = int(text)
     context.user_data["n_chars"] = n_chars
-    await update.message.reply_text(f"Хорошо. Я буду посылать книжку по {n_chars} символов.\nТеперь напиши, в какое "
+    if "timezone" in context.user_data:
+        await update.message.reply_text(f"Хорошо. Я буду посылать книжку по {n_chars} символов.\nТеперь напиши, в какое "
                                     f"время посылать, в формате чч:мм.")
 
-    return SET_TIME
+        return SET_TIME
+    else:
+        await update.message.reply_text(f"У тебя ещё не установлен часовой пояс. Введи его сейчас.")
+
+        return SET_TIMEZONE
 
 
 async def set_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     text = update.message.text
     timelist = re.split(r':', text)
-    time = datetime.time(int(timelist[0]), int(timelist[1]), )
+    timezone = context.user_data["timezone"]
+    time = datetime.time(int(timelist[0]), int(timelist[1]), tzinfo=timezone)
     context.user_data["time"] = time
-    context.user_data["last_bite"] = await update.message.reply_text(
-        f"Хорошо. Я буду посылать книжку в {time.isoformat(timespec='minutes')}.",
-        reply_markup=next_bite_markup)
-
     job = context.job_queue.run_daily(next_bite_scheduled, time, chat_id=update.effective_message.chat_id)
 
+    context.user_data["last_bite"] = await update.message.reply_text(
+        f"Хорошо. Я буду посылать книжку в {job.next_t}.",
+        reply_markup=next_bite_markup)
+
     return ConversationHandler.END
+
+
+async def set_timezone(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    text = update.message.text
+    try:
+        timezone = datetime.timezone(datetime.timedelta(hours=float(text)))
+        context.user_data["timezone"] = timezone
+        await update.message.reply_text(
+            f"Хорошо. Часовой пояс установлен.\nТеперь напиши, в какое "
+            f"время посылать, в формате чч:мм.")
+    except ValueError:
+        await update.message.reply_text("Неправильное значение! Попробуй ещё раз.")
+        return SET_TIMEZONE
+    return SET_TIME
+
+
+async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Ask the user about their UTC offset"""
+    if context.user_data.get("timezone"):
+        reply_text = (f"Согласно моим данным, твой часовой пояс - {context.user_data['timezone']}."
+                      f"")
+    else:
+        reply_text = "Пожалуйста, введи свой часовой пояс."
+    await update.message.reply_text(reply_text)
 
 
 async def next_bite_scheduled(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -103,7 +123,6 @@ async def next_bite_scheduled(context: ContextTypes.DEFAULT_TYPE) -> None:
 async def next_bite_immediate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer()
-    print(context.user_data["last_bite"])
     await query.edit_message_text(text=query.message.text)
 
 
@@ -133,7 +152,8 @@ if __name__ == '__main__':
         states={
             UPLOAD_BOOK: [MessageHandler(filters.Document.MimeType("application/epub+zip"), upload_book)],
             SET_N_CHARS: [MessageHandler(filters.Regex(r'^\d+$'), set_n_chars)],
-            SET_TIME: [MessageHandler(filters.Regex(r'^\d{1,2}:\d{1,2}$'), set_time)]
+            SET_TIME: [MessageHandler(filters.Regex(r'^\d{1,2}:\d{1,2}$'), set_time)],
+            SET_TIMEZONE: [MessageHandler(filters.Regex(r'^[+]?\d{1,2}$'), set_timezone)]
         },
         fallbacks=[CommandHandler("cancel", cancel)],
     )

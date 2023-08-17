@@ -2,9 +2,9 @@ import datetime
 import logging
 import re
 
-from telegram import Update, InlineKeyboardButton,InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import filters, MessageHandler, ApplicationBuilder, CommandHandler, ContextTypes, PicklePersistence, \
-    ConversationHandler, CallbackQueryHandler
+    ConversationHandler, CallbackQueryHandler, JobQueue
 from os import environ
 import ebooklib
 from ebooklib import epub
@@ -83,19 +83,31 @@ async def set_n_chars(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 async def set_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     text = update.message.text
     timelist = re.split(r':', text)
-    time = datetime.time(int(timelist[0]),int(timelist[1]),)
+    time = datetime.time(int(timelist[0]), int(timelist[1]), )
     context.user_data["time"] = time
-    await update.message.reply_text(f"Хорошо. Я буду посылать книжку в {time.isoformat(timespec='minutes')}.",
-                                    reply_markup=next_bite_markup)
+    context.user_data["last_bite"] = await update.message.reply_text(
+        f"Хорошо. Я буду посылать книжку в {time.isoformat(timespec='minutes')}.",
+        reply_markup=next_bite_markup)
+
+    job = context.job_queue.run_daily(next_bite_scheduled, time, chat_id=update.effective_message.chat_id)
 
     return ConversationHandler.END
 
 
-async def next_bite(update:Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def next_bite_scheduled(context: ContextTypes.DEFAULT_TYPE) -> None:
+    job = context.job
+    last_bite = context.application.user_data[job.chat_id]["last_bite"]
+    await  context.bot.edit_message_text(chat_id=job.chat_id, message_id=last_bite.message_id, text=last_bite.text)
+
+
+async def next_bite_immediate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer()
-
+    print(context.user_data["last_bite"])
     await query.edit_message_text(text=query.message.text)
+
+
+# async def next_bite(context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -127,6 +139,6 @@ if __name__ == '__main__':
     )
     application.add_handler(newbook_handler)
 
-    application.add_handler(CallbackQueryHandler(next_bite))
+    application.add_handler(CallbackQueryHandler(next_bite_immediate))
 
     application.run_polling()

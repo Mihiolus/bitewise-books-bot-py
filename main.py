@@ -1,6 +1,9 @@
 import datetime
 import logging
 import re
+import locale
+
+locale.setlocale(locale.LC_ALL, '')
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import filters, MessageHandler, ApplicationBuilder, CommandHandler, ContextTypes, PicklePersistence, \
@@ -65,8 +68,9 @@ async def set_n_chars(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     n_chars = int(text)
     context.user_data["n_chars"] = n_chars
     if "timezone" in context.user_data:
-        await update.message.reply_text(f"Хорошо. Я буду посылать книжку по {n_chars} символов.\nТеперь напиши, в какое "
-                                    f"время посылать, в формате чч:мм.")
+        await update.message.reply_text(
+            f"Хорошо. Я буду посылать книжку по {n_chars} символов.\nТеперь напиши, в какое "
+            f"время посылать, в формате чч:мм.")
 
         return SET_TIME
     else:
@@ -84,7 +88,7 @@ async def set_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     job = context.job_queue.run_daily(next_bite_scheduled, time, chat_id=update.effective_message.chat_id)
 
     context.user_data["last_bite"] = await update.message.reply_text(
-        f"Хорошо. Я буду посылать книжку в {job.next_t}.",
+        f"Хорошо. Следующий кусочек придёт {job.next_t.strftime('%d %b')} в {job.next_t.strftime('%H:%M')}.",
         reply_markup=next_bite_markup)
 
     return ConversationHandler.END

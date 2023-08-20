@@ -3,15 +3,16 @@ import logging
 import re
 import locale
 
-locale.setlocale(locale.LC_ALL, '')
-
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import filters, MessageHandler, ApplicationBuilder, CommandHandler, ContextTypes, PicklePersistence, \
     ConversationHandler, CallbackQueryHandler, JobQueue
 from os import environ
 import ebooklib
 from ebooklib import epub
+from lxml import etree
+from io import BytesIO
 
+locale.setlocale(locale.LC_ALL, '')
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
@@ -56,6 +57,15 @@ async def upload_book(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     await new_file.download_to_drive(custom_path=filepath)
 
     book = epub.read_epub(filepath)
+    text = bytearray()
+    for item in book.get_items():
+        if item.get_type() == ebooklib.ITEM_DOCUMENT:
+            content = item.get_content()
+            filelike = BytesIO(content)
+            tree = etree.parse(filelike)
+
+            text += etree.tostring(tree, method="text")
+    await update.message.reply_text(f"Найдено {len(text)} символов.")
     context.user_data["book_path"] = filepath
     await update.message.reply_text(
         f"Получил книжку \"{book.title}\".\nТеперь напиши, по сколько символов мне тебе посылать.")

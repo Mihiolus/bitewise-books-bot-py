@@ -9,8 +9,7 @@ from telegram.ext import filters, MessageHandler, ApplicationBuilder, CommandHan
 from os import environ
 import ebooklib
 from ebooklib import epub
-from lxml import etree
-from io import BytesIO
+from xml.etree import ElementTree
 
 locale.setlocale(locale.LC_ALL, '')
 logging.basicConfig(
@@ -57,15 +56,21 @@ async def upload_book(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     await new_file.download_to_drive(custom_path=filepath)
 
     book = epub.read_epub(filepath)
-    text = bytearray()
+    text_elements = []
     for item in book.get_items():
         if item.get_type() == ebooklib.ITEM_DOCUMENT:
             content = item.get_content()
-            filelike = BytesIO(content)
-            tree = etree.parse(filelike)
+            root = ElementTree.fromstring(content)
+            body_started = False
+            for element in root.iter():
+                if not body_started and element.tag.find("body"):
+                    body_started = True
+                if body_started and element.text:
+                    text_elements.append(element.text)
 
-            text += etree.tostring(tree, method="text")
-    await update.message.reply_text(f"Найдено {len(text)} символов.")
+    text = "".join(text_elements)
+    text_length = len(text) - text.count("\n")
+    await update.message.reply_text(f"Найдено {text_length} символов.")
     context.user_data["book_path"] = filepath
     await update.message.reply_text(
         f"Получил книжку \"{book.title}\".\nТеперь напиши, по сколько символов мне тебе посылать.")

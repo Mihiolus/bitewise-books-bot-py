@@ -68,10 +68,12 @@ async def upload_book(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
                 if body_started and element.text:
                     text_elements.append(element.text)
 
-    text = "".join(text_elements)
+    text = "".join(text_elements).strip()
     text_length = len(text) - text.count("\n")
     await update.message.reply_text(f"Найдено {text_length} символов.")
     context.user_data["book_path"] = filepath
+    context.user_data["book_text"] = text
+    context.user_data["cur_pos"] = 0
     await update.message.reply_text(
         f"Получил книжку \"{book.title}\".\nТеперь напиши, по сколько символов мне тебе посылать.")
 
@@ -135,8 +137,23 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def next_bite_scheduled(context: ContextTypes.DEFAULT_TYPE) -> None:
     job = context.job
-    last_bite = context.application.user_data[job.chat_id]["last_bite"]
-    await  context.bot.edit_message_text(chat_id=job.chat_id, message_id=last_bite.message_id, text=last_bite.text)
+    chat_id = job.chat_id
+    last_bite = context.application.user_data[chat_id]["last_bite"]
+    await context.bot.edit_message_text(chat_id=chat_id, message_id=last_bite.message_id, text=last_bite.text)
+    user_data = context.application.user_data[chat_id]
+    book_text = user_data["book_text"]
+    cur_pos = user_data["cur_pos"]
+    n_chars = user_data["n_chars"]
+    n = 0
+    for c in book_text[cur_pos:]:
+        if c == "\n" or c == "\t" or c == '':
+            n_chars += 1
+        n += 1
+        if n == n_chars:
+            break
+    next_bite = book_text[cur_pos:cur_pos + n_chars]
+    user_data["cur_pos"] = cur_pos + n_chars
+    user_data["last_bite"] = await context.bot.send_message(chat_id=chat_id, text=next_bite, reply_markup=next_bite_markup)
 
 
 async def next_bite_immediate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

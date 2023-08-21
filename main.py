@@ -3,6 +3,7 @@ import logging
 import re
 import locale
 
+import telegram
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import filters, MessageHandler, ApplicationBuilder, CommandHandler, ContextTypes, PicklePersistence, \
     ConversationHandler, CallbackQueryHandler, JobQueue
@@ -139,30 +140,43 @@ async def next_bite_scheduled(context: ContextTypes.DEFAULT_TYPE) -> None:
     job = context.job
     chat_id = job.chat_id
     last_bite = context.application.user_data[chat_id]["last_bite"]
-    await context.bot.edit_message_text(chat_id=chat_id, message_id=last_bite.message_id, text=last_bite.text)
+    await context.bot.edit_message_text(
+        chat_id=chat_id,
+        message_id=last_bite.message_id,
+        text=last_bite.text
+    )
     user_data = context.application.user_data[chat_id]
+    await next_bite(bot=context.bot, chat_id=chat_id, user_data=user_data)
+
+
+async def next_bite(bot:telegram.Bot, chat_id:int|str, user_data:object|dict):
     book_text = user_data["book_text"]
     cur_pos = user_data["cur_pos"]
     n_chars = user_data["n_chars"]
     n = 0
     for c in book_text[cur_pos:]:
-        if c == "\n" or c == "\t" or c == '':
+        if c == "\n" or c == "\t" or c == ' ':
             n_chars += 1
         n += 1
         if n == n_chars:
             break
-    next_bite = book_text[cur_pos:cur_pos + n_chars]
+    text = book_text[cur_pos:cur_pos + n_chars]
     user_data["cur_pos"] = cur_pos + n_chars
-    user_data["last_bite"] = await context.bot.send_message(chat_id=chat_id, text=next_bite, reply_markup=next_bite_markup)
+    user_data["last_bite"] = await bot.send_message(
+        chat_id=chat_id,
+        text=text,
+        reply_markup=next_bite_markup,
+        parse_mode='HTML'
+    )
 
 
 async def next_bite_immediate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer()
     await query.edit_message_text(text=query.message.text)
-
-
-# async def next_bite(context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_data = context.user_data
+    chat_id = update.effective_user.id
+    await next_bite(bot=context.bot, chat_id=chat_id, user_data=user_data)
 
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:

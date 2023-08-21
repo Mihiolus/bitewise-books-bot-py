@@ -69,7 +69,7 @@ async def upload_book(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
                 if body_started and element.text:
                     text_elements.append(element.text)
 
-    text = "".join(text_elements).strip()
+    text = "".join(text_elements)
     text_length = len(text) - text.count("\n")
     await update.message.reply_text(f"Найдено {text_length} символов.")
     context.user_data["book_path"] = filepath
